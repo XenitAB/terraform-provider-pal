@@ -55,7 +55,10 @@ func resourceManagementPartnerCreate(d *schema.ResourceData, m interface{}) erro
 		return err
 	}
 
-	mpClient.Create(context.Background(), partnerID)
+	if _, err := mpClient.Create(context.Background(), partnerID); err != nil {
+		return err
+	}
+
 	d.SetId(clientID + "-" + partnerID)
 	return resourceManagementPartnerRead(d, m)
 }
@@ -69,7 +72,10 @@ func resourceManagementPartnerRead(d *schema.ResourceData, m interface{}) error 
 		return err
 	}
 
-	mpClient.Get(context.Background(), partnerID)
+	if _, err := mpClient.Get(context.Background(), partnerID); err != nil {
+		return err
+	}
+
 	d.SetId(clientID + "-" + partnerID)
 	d.Set("partner_id", partnerID)
 	return nil
