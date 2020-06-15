@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/preview/managementpartner/mgmt/2018-02-01/managementpartner"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -47,6 +48,9 @@ func resourceManagementPartner() *schema.Resource {
 }
 
 func resourceManagementPartnerCreate(d *schema.ResourceData, m interface{}) error {
+	// Required as Service Principal secret is not valid if immediately used
+	time.Sleep(5 * time.Second)
+
 	clientID := d.Get("client_id").(string)
 	partnerID := d.Get("partner_id").(string)
 
