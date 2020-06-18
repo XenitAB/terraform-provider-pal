@@ -58,8 +58,14 @@ func resourceManagementPartnerCreate(d *schema.ResourceData, m interface{}) erro
 
 	// Needed as the SA password needs some time to become valid
 	err = resource.Retry(d.Timeout(schema.TimeoutCreate), func() *resource.RetryError {
-		if _, err := mpClient.Create(context.Background(), partnerID); err != nil {
-			return resource.RetryableError(err)
+		if err := resourceManagementPartnerRead(d, m); err != nil {
+			if _, err := mpClient.Create(context.Background(), partnerID); err != nil {
+				return resource.RetryableError(err)
+			}
+		} else {
+			if _, err := mpClient.Update(context.Background(), partnerID); err != nil {
+				return resource.RetryableError(err)
+			}
 		}
 
 		return nil
