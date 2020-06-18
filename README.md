@@ -2,11 +2,17 @@
 Provider to configure [Partner Admin Link](https://docs.microsoft.com/en-us/azure/cost-management-billing/manage/link-partner-id) for indiviual Service Principal.
 
 ## How To
+Download the required binaries from the latest version of the provider from the [release page](https://github.com/XenitAB/terraform-provider-pal/releases).
+Create a directory called `terraform.d/plugins` in you terraform project directory, and place
+all of the binaries in that directory.
+
 The provider provides the resource `pal_management_partner` which creates a PAL binding between
 a Service Principal and a parnter id. The provider does not take any parameters, instead the
 id and credentials for the Service Principal are given for each resource. This is required as
 each Service Principal needs to configure the PAL individually.
 
+Below is a full example of how to create a Service Principal and use the resource. In existing
+projects all you need to do is copy the `pal_management_partner` resource.
 ```hcl
 provider "azurerm" {
   version = "=2.14"
