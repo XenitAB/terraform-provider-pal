@@ -15,7 +15,7 @@ import (
 	"github.com/jongio/azidext/go/azidext"
 )
 
-func ResourceManagementPartner() *schema.Resource {
+func resourceManagementPartner() *schema.Resource {
 	return &schema.Resource{
 		Description:   "Configures Azure Admin Partent Link",
 		CreateContext: resourceManagementPartnerCreate,
