@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -47,6 +48,7 @@ func ResourceManagementPartner() *schema.Resource {
 			},
 			"overwrite": {
 				Type:        schema.TypeBool,
+				Optional:    true,
 				Default:     false,
 				Description: "Overwrite existing PAL",
 			},
@@ -61,7 +63,7 @@ func resourceManagementPartnerCreate(ctx context.Context, d *schema.ResourceData
 	partnerID := d.Get("partner_id").(string)
 	overwrite := d.Get("overwrite").(bool)
 
-	mpClient, err := setupClient(tenantID, clientID, clientSecret)
+	mpClient, err := setupClient(ctx, tenantID, clientID, clientSecret)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -91,7 +93,7 @@ func resourceManagementPartnerRead(ctx context.Context, d *schema.ResourceData, 
 	clientSecret := d.Get("client_secret").(string)
 	partnerID := d.Get("partner_id").(string)
 
-	mpClient, err := setupClient(tenantID, clientID, clientSecret)
+	mpClient, err := setupClient(ctx, tenantID, clientID, clientSecret)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -100,7 +102,7 @@ func resourceManagementPartnerRead(ctx context.Context, d *schema.ResourceData, 
 		return diag.FromErr(err)
 	}
 
-	d.SetId(clientID + "-" + partnerID)
+	d.SetId(fmt.Sprintf("%s-%s", clientID, partnerID))
 	d.Set("partner_id", partnerID)
 	return nil
 }
@@ -111,7 +113,7 @@ func resourceManagementPartnerUpdate(ctx context.Context, d *schema.ResourceData
 	clientSecret := d.Get("client_secret").(string)
 	partnerID := d.Get("partner_id").(string)
 
-	mpClient, err := setupClient(tenantID, clientID, clientSecret)
+	mpClient, err := setupClient(ctx, tenantID, clientID, clientSecret)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -129,7 +131,7 @@ func resourceManagementPartnerDelete(ctx context.Context, d *schema.ResourceData
 	clientSecret := d.Get("client_secret").(string)
 	partnerID := d.Get("partner_id").(string)
 
-	mpClient, err := setupClient(tenantID, clientID, clientSecret)
+	mpClient, err := setupClient(ctx, tenantID, clientID, clientSecret)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -142,19 +144,22 @@ func resourceManagementPartnerDelete(ctx context.Context, d *schema.ResourceData
 	return nil
 }
 
-func setupClient(tenantID, clientID, clientSecret string) (*managementpartner.PartnerClient, error) {
-	cred, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, &azidentity.ClientSecretCredentialOptions{})
+func setupClient(ctx context.Context, tenantID, clientID, clientSecret string) (*managementpartner.PartnerClient, error) {
+	retryOpt := azcore.DefaultRetryOptions()
+	retryOpt.MaxRetries = 0
+	cred, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, &azidentity.ClientSecretCredentialOptions{Retry: retryOpt})
 	if err != nil {
 		return nil, err
 	}
 
 	// Wait for Service Account credentials to be valid as it may take a while if just created
 	timeout := 5 * time.Minute
-	err = resource.Retry(timeout, func() *resource.RetryError {
+	err = resource.RetryContext(ctx, timeout, func() *resource.RetryError {
 		opt := azcore.TokenRequestOptions{Scopes: []string{"https://management.azure.com/.default"}}
-		_, err := cred.GetToken(context.Background(), opt)
+		_, err := cred.GetToken(ctx, opt)
 		if err != nil {
-			resource.RetryableError(err)
+			log.Printf("[DEBUG] %v", err)
+			return resource.RetryableError(err)
 		}
 
 		return nil
@@ -170,6 +175,7 @@ func setupClient(tenantID, clientID, clientSecret string) (*managementpartner.Pa
 	}
 
 	mpClient := managementpartner.NewPartnerClient()
+	mpClient.RetryAttempts = 0
 	mpClient.Authorizer = authorizer
 	return &mpClient, nil
 }

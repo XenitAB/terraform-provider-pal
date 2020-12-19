@@ -10,4 +10,6 @@ require (
 	github.com/Azure/go-autorest/autorest/adal v0.9.8 // indirect
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.4.0
 	github.com/jongio/azidext/go/azidext v0.1.0
+	github.com/mattn/go-colorable v0.1.7 // indirect
+	github.com/zclconf/go-cty v1.4.1 // indirect
 )
