@@ -2,12 +2,12 @@
 page_title: "pal_management_partner Resource - terraform-provider-pal"
 subcategory: ""
 description: |-
-  Configures Azure Admin Partent Link
+  Configures Azure Admin Partner Link
 ---
 
 # Resource `pal_management_partner`
 
-Configures Azure Admin Partent Link
+Configures Azure Admin Partner Link
 
 
 
@@ -23,6 +23,6 @@ Configures Azure Admin Partent Link
 ### Optional
 
 - **id** (String) The ID of this resource.
-- **overwrite** (Boolean) Overwrite existing PAL
+- **overwrite** (Boolean) Overwrite existing PAL Defaults to `false`.
 
 
