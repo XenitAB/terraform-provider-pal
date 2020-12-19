@@ -11,4 +11,5 @@ require (
 	github.com/hashicorp/terraform-plugin-docs v0.3.0
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.4.0
 	github.com/jongio/azidext/go/azidext v0.1.0
+	go.uber.org/multierr v1.6.0
 )
