@@ -17,7 +17,7 @@ import (
 
 func resourceManagementPartner() *schema.Resource {
 	return &schema.Resource{
-		Description:   "Configures Azure Admin Partent Link",
+		Description:   "Configures Azure Admin Partner Link",
 		CreateContext: resourceManagementPartnerCreate,
 		ReadContext:   resourceManagementPartnerRead,
 		UpdateContext: resourceManagementPartnerUpdate,
