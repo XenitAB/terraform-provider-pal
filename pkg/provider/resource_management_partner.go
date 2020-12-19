@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/jongio/azidext/go/azidext"
+	"go.uber.org/multierr"
 )
 
 func resourceManagementPartner() *schema.Resource {
@@ -68,21 +69,26 @@ func resourceManagementPartnerCreate(ctx context.Context, d *schema.ResourceData
 		return diag.FromErr(err)
 	}
 
-	// Check for existing PAL if overwrite is true
-	if overwrite {
-		_, err := mpClient.Get(ctx, partnerID)
-		if err == nil {
-			if _, err := mpClient.Update(ctx, partnerID); err != nil {
-				return diag.FromErr(err)
-			}
-			d.SetId(fmt.Sprintf("%s-%s", clientID, partnerID))
-			return resourceManagementPartnerRead(ctx, d, m)
+	_, createErr := mpClient.Create(ctx, partnerID)
+	if createErr != nil && !overwrite {
+		return diag.FromErr(err)
+	}
+
+	if createErr != nil && overwrite {
+		if _, err := mpClient.Update(ctx, partnerID); err != nil {
+			return diag.FromErr(multierr.Combine(createErr, err))
 		}
 	}
 
-	if _, err := mpClient.Create(ctx, partnerID); err != nil {
-		return diag.FromErr(err)
-	}
+	err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutCreate), func() *resource.RetryError {
+		_, err := mpClient.Get(ctx, partnerID)
+		if err != nil {
+			return resource.RetryableError(err)
+		}
+
+		return nil
+	})
+
 	d.SetId(fmt.Sprintf("%s-%s", clientID, partnerID))
 	return resourceManagementPartnerRead(ctx, d, m)
 }
@@ -121,6 +127,15 @@ func resourceManagementPartnerUpdate(ctx context.Context, d *schema.ResourceData
 	if _, err := mpClient.Update(ctx, partnerID); err != nil {
 		return diag.FromErr(err)
 	}
+
+	err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutUpdate), func() *resource.RetryError {
+		_, err := mpClient.Get(ctx, partnerID)
+		if err != nil {
+			return resource.RetryableError(err)
+		}
+
+		return nil
+	})
 
 	return resourceManagementPartnerRead(ctx, d, m)
 }
