@@ -12,7 +12,7 @@ terraform {
     }
     pal = {
       source  = "xenitab/pal"
-      version = ">=0.2.0"
+      version = "0.0.0-dev"
     }
   }
 }

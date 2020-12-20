@@ -185,9 +185,6 @@ func setupClient(ctx context.Context, tenantID, clientID, clientSecret string) (
 
 	opt := azcore.AuthenticationPolicyOptions{Options: azcore.TokenRequestOptions{Scopes: []string{"https://management.azure.com/.default"}}}
 	authorizer := azidext.NewAzureIdentityCredentialAdapter(cred, opt)
-	if err != nil {
-		return nil, err
-	}
 
 	mpClient := managementpartner.NewPartnerClient()
 	mpClient.RetryAttempts = 0
