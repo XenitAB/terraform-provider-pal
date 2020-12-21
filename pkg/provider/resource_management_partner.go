@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -69,25 +70,45 @@ func resourceManagementPartnerCreate(ctx context.Context, d *schema.ResourceData
 		return diag.FromErr(err)
 	}
 
-	_, createErr := mpClient.Create(ctx, partnerID)
-	if createErr != nil && !overwrite {
-		return diag.FromErr(err)
+	createErr := resource.RetryContext(ctx, d.Timeout(schema.TimeoutCreate), func() *resource.RetryError {
+		_, err := mpClient.Create(ctx, partnerID)
+		// The request needs to be retried as sometimes the client secret takes time to become
+		// valid even though a token is returned.
+		if err != nil && strings.Contains(err.Error(), "AADSTS7000215") {
+			err := fmt.Errorf("client secret is yet to be propogated (AADSTS7000215): %v", err)
+			log.Printf("[DEBUG] %v", err)
+			return resource.RetryableError(err)
+		}
+
+		if err != nil {
+			return resource.NonRetryableError(err)
+		}
+
+		return nil
+	})
+	if err != nil && !overwrite {
+		return diag.Errorf("could not create management partner", err)
 	}
 
 	if createErr != nil && overwrite {
 		if _, err := mpClient.Update(ctx, partnerID); err != nil {
-			return diag.FromErr(multierr.Combine(createErr, err))
+			return diag.Errorf("could not create/update management partner: %v", multierr.Combine(createErr, err))
 		}
 	}
 
 	err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutCreate), func() *resource.RetryError {
 		_, err := mpClient.Get(ctx, partnerID)
 		if err != nil {
+			err = fmt.Errorf("could not get management partner: %v", err)
+			log.Printf("[DEBUG] %v", err)
 			return resource.RetryableError(err)
 		}
 
 		return nil
 	})
+	if err != nil {
+		return diag.Errorf("could not get created management partner: %v", err)
+	}
 
 	d.SetId(fmt.Sprintf("%s-%s", clientID, partnerID))
 	return resourceManagementPartnerRead(ctx, d, m)
@@ -105,7 +126,7 @@ func resourceManagementPartnerRead(ctx context.Context, d *schema.ResourceData, 
 	}
 
 	if _, err := mpClient.Get(ctx, partnerID); err != nil {
-		return diag.FromErr(err)
+		return diag.Errorf("could not get management partner: %v", err)
 	}
 
 	d.SetId(fmt.Sprintf("%s-%s", clientID, partnerID))
@@ -125,17 +146,22 @@ func resourceManagementPartnerUpdate(ctx context.Context, d *schema.ResourceData
 	}
 
 	if _, err := mpClient.Update(ctx, partnerID); err != nil {
-		return diag.FromErr(err)
+		return diag.Errorf("could not update management partner: %v", err)
 	}
 
 	err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutUpdate), func() *resource.RetryError {
 		_, err := mpClient.Get(ctx, partnerID)
 		if err != nil {
+			err = fmt.Errorf("could not get management partner: %v", err)
+			log.Printf("[DEBUG] %v", err)
 			return resource.RetryableError(err)
 		}
 
 		return nil
 	})
+	if err != nil {
+		return diag.Errorf("could not get updated management partner: %v", err)
+	}
 
 	return resourceManagementPartnerRead(ctx, d, m)
 }
@@ -152,7 +178,7 @@ func resourceManagementPartnerDelete(ctx context.Context, d *schema.ResourceData
 	}
 
 	if _, err := mpClient.Delete(ctx, partnerID); err != nil {
-		return diag.FromErr(err)
+		return diag.Errorf("could not delete management partner: %v", err)
 	}
 
 	d.SetId("")
@@ -164,7 +190,7 @@ func setupClient(ctx context.Context, tenantID, clientID, clientSecret string) (
 	retryOpt.MaxRetries = 0
 	cred, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, &azidentity.ClientSecretCredentialOptions{Retry: retryOpt})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid client credentials: %v", err)
 	}
 
 	// Wait for Service Account credentials to be valid as it may take a while if just created
@@ -173,6 +199,7 @@ func setupClient(ctx context.Context, tenantID, clientID, clientSecret string) (
 		opt := azcore.TokenRequestOptions{Scopes: []string{"https://management.azure.com/.default"}}
 		_, err := cred.GetToken(ctx, opt)
 		if err != nil {
+			err = fmt.Errorf("could not get valid token: %v", err)
 			log.Printf("[DEBUG] %v", err)
 			return resource.RetryableError(err)
 		}
@@ -180,14 +207,11 @@ func setupClient(ctx context.Context, tenantID, clientID, clientSecret string) (
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not verify client credentials: %v", err)
 	}
 
 	opt := azcore.AuthenticationPolicyOptions{Options: azcore.TokenRequestOptions{Scopes: []string{"https://management.azure.com/.default"}}}
 	authorizer := azidext.NewAzureIdentityCredentialAdapter(cred, opt)
-	if err != nil {
-		return nil, err
-	}
 
 	mpClient := managementpartner.NewPartnerClient()
 	mpClient.RetryAttempts = 0
