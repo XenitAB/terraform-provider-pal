@@ -96,6 +96,20 @@ func resourceManagementPartnerCreate(ctx context.Context, d *schema.ResourceData
 		}
 	}
 
+	err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutCreate), func() *resource.RetryError {
+		_, err := mpClient.Get(ctx, partnerID)
+		if err != nil {
+			err = fmt.Errorf("could not get management partner: %v", err)
+			log.Printf("[DEBUG] %v", err)
+			return resource.RetryableError(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return diag.Errorf("could not get created management partner: %v", err)
+	}
+
 	d.SetId(fmt.Sprintf("%s-%s", clientID, partnerID))
 	return resourceManagementPartnerRead(ctx, d, m)
 }
