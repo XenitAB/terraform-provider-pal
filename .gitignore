@@ -24,7 +24,7 @@
 /Godeps/
 
 # End of https://www.toptal.com/developers/gitignore/api/go
-n
+
 # Created by https://www.toptal.com/developers/gitignore/api/terraform
 # Edit at https://www.toptal.com/developers/gitignore?templates=terraform
 
@@ -59,4 +59,3 @@ override.tf.json
 # example: *tfplan*
 
 # End of https://www.toptal.com/developers/gitignore/api/terraform
-n
