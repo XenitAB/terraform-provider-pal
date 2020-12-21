@@ -127,16 +127,22 @@ func resourceManagementPartnerRead(ctx context.Context, d *schema.ResourceData, 
 
 	err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutCreate), func() *resource.RetryError {
 		_, err := mpClient.Get(ctx, partnerID)
-		if err != nil {
-			err = fmt.Errorf("could not get management partner: %v", err)
+		// The request needs to be retried as sometimes the client secret takes time to become
+		// valid even though a token is returned.
+		if err != nil && strings.Contains(err.Error(), "AADSTS7000215") {
+			err := fmt.Errorf("client secret is yet to be propogated (AADSTS7000215): %v", err)
 			log.Printf("[DEBUG] %v", err)
 			return resource.RetryableError(err)
+		}
+
+		if err != nil {
+			return resource.NonRetryableError(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return diag.Errorf("could not get created management partner: %v", err)
+		return diag.Errorf("could not read management partner", err)
 	}
 
 	d.SetId(fmt.Sprintf("%s-%s", clientID, partnerID))
