@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -69,9 +70,22 @@ func resourceManagementPartnerCreate(ctx context.Context, d *schema.ResourceData
 		return diag.FromErr(err)
 	}
 
-	_, createErr := mpClient.Create(ctx, partnerID)
-	if createErr != nil && !overwrite {
-		return diag.Errorf("could not create management partner: %v", err)
+	createErr := resource.RetryContext(ctx, d.Timeout(schema.TimeoutCreate), func() *resource.RetryError {
+		_, err := mpClient.Create(ctx, partnerID)
+		// The request needs to be retried as sometimes the client secret takes time to become
+		// valid even though a token is returned.
+		if err != nil && strings.Contains(err.Error(), "AADSTS7000215") {
+			return resource.RetryableError(fmt.Errorf("client secret is yet to be propogated (AADSTS7000215): %v", err))
+		}
+
+		if err != nil {
+			return resource.NonRetryableError(err)
+		}
+
+		return nil
+	})
+	if err != nil && !overwrite {
+		return diag.Errorf("could not create management partner", err)
 	}
 
 	if createErr != nil && overwrite {
@@ -80,7 +94,7 @@ func resourceManagementPartnerCreate(ctx context.Context, d *schema.ResourceData
 		}
 	}
 
-	err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutUpdate), func() *resource.RetryError {
+	err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutCreate), func() *resource.RetryError {
 		_, err := mpClient.Get(ctx, partnerID)
 		if err != nil {
 			err = fmt.Errorf("could not get management partner: %v", err)
