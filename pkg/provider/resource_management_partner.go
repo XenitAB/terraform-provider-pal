@@ -75,7 +75,9 @@ func resourceManagementPartnerCreate(ctx context.Context, d *schema.ResourceData
 		// The request needs to be retried as sometimes the client secret takes time to become
 		// valid even though a token is returned.
 		if err != nil && strings.Contains(err.Error(), "AADSTS7000215") {
-			return resource.RetryableError(fmt.Errorf("client secret is yet to be propogated (AADSTS7000215): %v", err))
+			err := fmt.Errorf("client secret is yet to be propogated (AADSTS7000215): %v", err)
+			log.Printf("[DEBUG] %v", err)
+			return resource.RetryableError(err)
 		}
 
 		if err != nil {
