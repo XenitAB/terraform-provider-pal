@@ -87,7 +87,7 @@ func resourceManagementPartnerCreate(ctx context.Context, d *schema.ResourceData
 		return nil
 	})
 	if err != nil && !overwrite {
-		return diag.Errorf("could not create management partner", err)
+		return diag.FromErr(fmt.Errorf("could not create management partner: %w", err))
 	}
 
 	if createErr != nil && overwrite {
@@ -142,7 +142,7 @@ func resourceManagementPartnerRead(ctx context.Context, d *schema.ResourceData, 
 		return nil
 	})
 	if err != nil {
-		return diag.Errorf("could not read management partner", err)
+		return diag.FromErr(fmt.Errorf("could not read management partner: %w", err))
 	}
 
 	d.SetId(fmt.Sprintf("%s-%s", clientID, partnerID))
@@ -178,7 +178,7 @@ func resourceManagementPartnerUpdate(ctx context.Context, d *schema.ResourceData
 		return nil
 	})
 	if err != nil {
-		return diag.Errorf("could not update management partner", err)
+		return diag.FromErr(fmt.Errorf("could not update management partner: %w", err))
 	}
 
 	return resourceManagementPartnerRead(ctx, d, m)
@@ -212,7 +212,7 @@ func resourceManagementPartnerDelete(ctx context.Context, d *schema.ResourceData
 		return nil
 	})
 	if err != nil {
-		return diag.Errorf("could not delete management partner", err)
+		return diag.FromErr(fmt.Errorf("could not delete management partner: %w", err))
 	}
 
 	d.SetId("")
