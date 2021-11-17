@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/services/preview/managementpartner/mgmt/2018-02-01/managementpartner"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -220,35 +221,43 @@ func resourceManagementPartnerDelete(ctx context.Context, d *schema.ResourceData
 }
 
 func setupClient(ctx context.Context, tenantID, clientID, clientSecret string) (*managementpartner.PartnerClient, error) {
-	retryOpt := azcore.DefaultRetryOptions()
-	retryOpt.MaxRetries = 0
-	cred, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, &azidentity.ClientSecretCredentialOptions{Retry: retryOpt})
+	defaultScope := []string{"https://management.azure.com/.default"}
+
+	// Configure client secret credenitals
+	// Zero value options will be defaulted
+	opts := &azidentity.ClientSecretCredentialOptions{
+		ClientOptions: azcore.ClientOptions{
+			Retry: policy.RetryOptions{
+				// A value less than zero means one try and no retries
+				MaxRetries: -1,
+			},
+		},
+	}
+	cred, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, opts)
 	if err != nil {
-		return nil, fmt.Errorf("invalid client credentials: %v", err)
+		return nil, fmt.Errorf("invalid client credentials: %w", err)
 	}
 
 	// Wait for Service Account credentials to be valid as it may take a while if just created
 	timeout := 5 * time.Minute
 	err = resource.RetryContext(ctx, timeout, func() *resource.RetryError {
-		opt := azcore.TokenRequestOptions{Scopes: []string{"https://management.azure.com/.default"}}
-		_, err := cred.GetToken(ctx, opt)
-		if err != nil {
-			err = fmt.Errorf("could not get valid token: %v", err)
+		opts := policy.TokenRequestOptions{
+			Scopes: defaultScope,
+		}
+		if _, err := cred.GetToken(ctx, opts); err != nil {
+			err = fmt.Errorf("could not get valid token: %w", err)
 			log.Printf("[DEBUG] %v", err)
 			return resource.RetryableError(err)
 		}
-
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("could not verify client credentials: %v", err)
+		return nil, fmt.Errorf("could not verify client credentials: %w", err)
 	}
 
-	opt := azcore.AuthenticationPolicyOptions{Options: azcore.TokenRequestOptions{Scopes: []string{"https://management.azure.com/.default"}}}
-	authorizer := azidext.NewAzureIdentityCredentialAdapter(cred, opt)
-
+	// Create and return partner client
 	mpClient := managementpartner.NewPartnerClient()
+	mpClient.Authorizer = azidext.NewTokenCredentialAdapter(cred, defaultScope)
 	mpClient.RetryAttempts = 0
-	mpClient.Authorizer = authorizer
 	return &mpClient, nil
 }
