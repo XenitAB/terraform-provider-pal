@@ -59,3 +59,5 @@ override.tf.json
 # example: *tfplan*
 
 # End of https://www.toptal.com/developers/gitignore/api/terraform
+
+/bin
